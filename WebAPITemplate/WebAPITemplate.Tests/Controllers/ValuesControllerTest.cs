@@ -7,6 +7,11 @@ using System.Web.Http;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using WebAPITemplate;
 using WebAPITemplate.Controllers;
+using System.ServiceModel.Syndication;
+using System.Diagnostics;
+using System.Xml;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace WebAPITemplate.Tests.Controllers
 {
@@ -14,68 +19,41 @@ namespace WebAPITemplate.Tests.Controllers
     public class ValuesControllerTest
     {
         [TestMethod]
-        public void Get()
+        public async Task ValidateFeed()
         {
             // Arrange
             ValuesController controller = new ValuesController();
 
             // Act
-            IEnumerable<string> result = controller.Get();
-
+            HttpResponseMessage result = controller.Get();
+            var isValidFeed = await TryParseFeed(result);
             // Assert
             Assert.IsNotNull(result);
-            Assert.AreEqual(2, result.Count());
-            Assert.AreEqual("value1", result.ElementAt(0));
-            Assert.AreEqual("value2", result.ElementAt(1));
+            Assert.IsTrue(isValidFeed);
         }
 
-        [TestMethod]
-        public void GetById()
+        public async Task<bool> TryParseFeed(HttpResponseMessage response)
         {
-            // Arrange
-            ValuesController controller = new ValuesController();
+            try
+            {
 
-            // Act
-            string result = controller.Get(5);
+                Stream dataStream = await response.Content.ReadAsStreamAsync();
+                StreamReader reader = new StreamReader(dataStream);
+                string strResponse = reader.ReadToEnd();
+                reader.BaseStream.Position = 0;
 
-            // Assert
-            Assert.AreEqual("value", result);
-        }
+                SyndicationFeed feed = SyndicationFeed.Load(XmlReader.Create(dataStream));
 
-        [TestMethod]
-        public void Post()
-        {
-            // Arrange
-            ValuesController controller = new ValuesController();
-
-            // Act
-            controller.Post("value");
-
-            // Assert
-        }
-
-        [TestMethod]
-        public void Put()
-        {
-            // Arrange
-            ValuesController controller = new ValuesController();
-
-            // Act
-            controller.Put(5, "value");
-
-            // Assert
-        }
-
-        [TestMethod]
-        public void Delete()
-        {
-            // Arrange
-            ValuesController controller = new ValuesController();
-
-            // Act
-            controller.Delete(5);
-
-            // Assert
+                foreach (SyndicationItem item in feed.Items)
+                {
+                    Debug.Print(item.Title.Text);
+                }
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
     }
 }
